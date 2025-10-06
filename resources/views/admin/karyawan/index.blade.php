@@ -4,11 +4,11 @@
             <h2 class="text-2xl font-bold leading-tight text-base-content">
                 {{ __('Data Karyawan Magang') }}
             </h2>
-     
+
             <div class="flex gap-2">
                 {{-- Tombol Export --}}
                 <a href="{{ route('admin.karyawan.export') }}"
-                    class="btn btn-success btn-md rounded-full shadow-md hover:shadow-lg transition-all duration-200">
+                    class="btn btn-success btn-md rounded-full shadow-md hover:shadow-lg transition-all duration-200 no-loading">
                     <i class="ri-download-cloud-line mr-1"></i>
                     Export Data
                 </a>
@@ -26,7 +26,203 @@
             </div>
         </div>
     </x-slot>
+    {{-- Simpan data departemen di elemen tersembunyi --}}
+<script id="departemen-data" type="application/json">
+    @json($departemen)
+</script>
 
+<script>
+// Ambil data departemen dari elemen HTML
+var departemenData = [];
+try {
+    var elem = document.getElementById('departemen-data');
+    if (elem) {
+        departemenData = JSON.parse(elem.textContent);
+    }
+} catch(e) {
+    console.error('Error parsing departemen data:', e);
+}
+
+// Fungsi delete
+window.delete_button = function(nik, nama) {
+    window.deleteNik = nik;
+    var deleteMsg = '<p class="text-base-content text-opacity-80 mb-2">Anda yakin ingin menghapus data karyawan magang ini?</p>';
+    deleteMsg += '<div class="divider text-base-content text-opacity-60"></div>';
+    deleteMsg += '<div class="text-center">';
+    deleteMsg += '<p class="font-bold text-lg">' + nama + '</p>';
+    deleteMsg += '<p class="text-sm text-base-content text-opacity-70">NIK: ' + nik + '</p>';
+    deleteMsg += '</div>';
+    document.getElementById('delete_message').innerHTML = deleteMsg;
+    document.getElementById('modal_delete').checked = true;
+}
+
+// Fungsi edit
+window.edit_button = function(nik) {
+    var loading = '<span class="loading loading-dots loading-md text-primary"></span>';
+    $("#loading_edit1").html(loading);
+    $("#loading_edit2").html(loading);
+    $("#loading_edit3").html(loading);
+    $("#loading_edit4").html(loading);
+    $("#loading_edit5").html(loading);
+    $("#loading_edit6").html(loading);
+    $("#loading_edit7").html(loading);
+
+    $("select[id='departemen_id']").children().remove().end();
+    $(".foto-edit-preview").hide().attr("src", "");
+
+    $.ajax({
+        type: "get",
+        url: "{{ route('admin.karyawan.edit') }}",
+        data: {
+            "_token": "{{ csrf_token() }}",
+            "nik": nik
+        },
+        success: function(data) {
+            var items = [];
+            $.each(data, function(key, val) {
+                items.push(val);
+            });
+
+            $("input[name='nik_lama']").val(items[0]);
+            $("input[name='nik']").val(items[0]);
+            $("input[name='nama_lengkap']").val(items[2]);
+            $("input[name='jabatan']").val(items[4]);
+            $("input[name='telepon']").val(items[5]);
+            $("input[name='email']").val(items[6]);
+
+            var options = '<option disabled>Pilih Instansi!</option>';
+            for (var i = 0; i < departemenData.length; i++) {
+                var item = departemenData[i];
+                var isSelected = item.id == items[1] ? 'selected' : '';
+                options += '<option value="' + item.id + '" ' + isSelected + '>' + item.nama + '</option>';
+            }
+            $("select[id='departemen_id']").html(options);
+
+            if (items[3] != null) {
+                var fotoUrl = "{{ asset('storage/unggah/karyawan') }}/" + items[3];
+                $(".foto-edit-preview").attr("src", fotoUrl).show();
+            } else {
+                $(".foto-edit-preview").hide();
+            }
+
+            loading = "";
+            $("#loading_edit1").html(loading);
+            $("#loading_edit2").html(loading);
+            $("#loading_edit3").html(loading);
+            $("#loading_edit4").html(loading);
+            $("#loading_edit5").html(loading);
+            $("#loading_edit6").html(loading);
+            $("#loading_edit7").html(loading);
+        }
+    });
+}
+
+// Preview gambar untuk create
+function previewImage() {
+    var image = document.querySelector('#foto');
+    var imgPreview = document.querySelector('.img-preview');
+    if (image.files && image.files[0]) {
+        imgPreview.style.display = 'block';
+        var oFReader = new FileReader();
+        oFReader.readAsDataURL(image.files[0]);
+        oFReader.onload = function(oFREvent) {
+            imgPreview.src = oFREvent.target.result;
+        }
+    }
+}
+
+// Preview gambar untuk edit
+function previewImageEdit() {
+    var image = document.querySelector('#foto_edit');
+    var imgPreview = document.querySelector('.foto-edit-preview');
+    if (image.files && image.files[0]) {
+        imgPreview.style.display = 'block';
+        var oFReader = new FileReader();
+        oFReader.readAsDataURL(image.files[0]);
+        oFReader.onload = function(oFREvent) {
+            imgPreview.src = oFREvent.target.result;
+        }
+    } else {
+        imgPreview.style.display = 'none';
+        imgPreview.src = '';
+    }
+}
+
+// Modal alert
+function showModalAlert(title, message, type) {
+    type = type || 'info';
+    var modalTitle = document.getElementById('modal_title');
+    var modalMessage = document.getElementById('modal_message');
+    var modalBox = document.querySelector('#modal_alert + .modal > .modal-box');
+    
+    // Cek apakah elemen ada
+    if (!modalTitle || !modalMessage || !modalBox) {
+        console.error('Modal elements not found');
+        return;
+    }
+    
+    modalTitle.textContent = title;
+    modalMessage.innerHTML = message;
+    
+    if (type === 'success') {
+        modalTitle.className = 'font-bold text-lg text-success';
+        modalBox.className = 'modal-box border border-success bg-base-100 text-base-content';
+    } else if (type === 'error') {
+        modalTitle.className = 'font-bold text-lg text-error';
+        modalBox.className = 'modal-box border border-error bg-base-100 text-base-content';
+    } else {
+        modalTitle.className = 'font-bold text-lg text-primary';
+        modalBox.className = 'modal-box border border-primary bg-base-100 text-base-content';
+    }
+    
+    document.getElementById('modal_alert').checked = true;
+}
+
+// Tunggu sampai DOM siap
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // Notifikasi session - DIPINDAHKAN KE SINI
+    @if (session()->has('success'))
+        showModalAlert('Berhasil!', '{{ session("success") }}', 'success');
+    @endif
+
+    @if (session()->has('error'))
+        showModalAlert('Gagal!', '{!! str_replace(["'", "\r", "\n"], ["\'", "", "<br>"], session("error")) !!}', 'error');
+    @endif
+
+    // Handler hapus data
+    var confirmBtn = document.getElementById('confirm_delete_btn');
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', function() {
+            if (!window.deleteNik) return;
+            
+            $.ajax({
+                type: "post",
+                url: "{{ route('admin.karyawan.delete') }}",
+                data: {
+                    "_token": "{{ csrf_token() }}",
+                    "nik": window.deleteNik
+                },
+                success: function(response) {
+                    document.getElementById('modal_delete').checked = false;
+                    showModalAlert('Berhasil Dihapus!', response.message, 'success');
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1500);
+                },
+                error: function(response) {
+                    document.getElementById('modal_delete').checked = false;
+                    var message = 'Terjadi kesalahan saat menghapus data.';
+                    if (response.responseJSON && response.responseJSON.message) {
+                        message = response.responseJSON.message;
+                    }
+                    showModalAlert('Gagal Menghapus!', message, 'error');
+                }
+            });
+        });
+    }
+});
+</script>
     <div class="container mx-auto py-6 px-4 sm:px-6 lg:px-8">
         {{-- Search & Filter Form --}}
         <div class="bg-base-100 shadow-lg rounded-lg p-6 mb-6 border border-base-200">
@@ -159,7 +355,7 @@
                             class="select select-bordered w-full focus:ring-primary focus:border-primary">
                             <option disabled selected>Pilih Instansi!</option>
                             @foreach ($departemen as $item)
-                                <option @if ($item->id == old('departemen_id')) selected @endif>
+                                <option value="{{ $item->id }}">
                                     {{ $item->nama }}</option>
                             @endforeach
                         </select>
@@ -457,178 +653,5 @@
     {{-- Akhir Modal Import --}}
 
 
-    <script>
-        function previewImage() {
-            const image = document.querySelector('#foto');
-            const imgPreview = document.querySelector('.img-preview');
-
-            imgPreview.style.display = 'block';
-
-            const oFReader = new FileReader();
-            oFReader.readAsDataURL(image.files[0]);
-
-            oFReader.onload = function(oFREvent) {
-                imgPreview.src = oFREvent.target.result;
-            }
-        }
-
-        function previewImageEdit() {
-            const image = document.querySelector('#foto_edit');
-            const imgPreview = document.querySelector('.foto-edit-preview');
-
-            if (image.files && image.files[0]) {
-                imgPreview.style.display = 'block';
-                const oFReader = new FileReader();
-                oFReader.readAsDataURL(image.files[0]);
-                oFReader.onload = function(oFREvent) {
-                    imgPreview.src = oFREvent.target.result;
-                }
-            } else {
-                imgPreview.style.display = 'none'; // Sembunyikan jika tidak ada file yang dipilih
-                imgPreview.src = '';
-            }
-        }
-
-
-        // Notifikasi sukses
-        @if (session()->has('success'))
-            showModalAlert('Berhasil!', '{{ session('success') }}', 'success');
-        @endif
-
-        // Notifikasi error
-        @if (session()->has('error'))
-            showModalAlert('Gagal!', '{{ session('error') }}', 'error');
-        @endif
-
-        @if (session()->has('error') && Str::contains(session('error'), 'Gagal mengimpor data'))
-            showModalAlert('Gagal Impor!', '{!! session('error') !!}', 'error');
-        @endif
-
-        // Fungsi umum untuk modal notifikasi
-        function showModalAlert(title, message, type = 'info') {
-            const modalTitle = document.getElementById('modal_title');
-            const modalMessage = document.getElementById('modal_message');
-            const modalBox = document.querySelector('#modal_alert + .modal > .modal-box');
-
-            modalTitle.textContent = title;
-            modalMessage.textContent = message;
-
-            // Ubah warna modal sesuai tipe
-            if (type === 'success') {
-                modalTitle.classList = 'font-bold text-lg text-success';
-                modalBox.classList = 'modal-box border border-success bg-base-100 text-base-content';
-            } else if (type === 'error') {
-                modalTitle.classList = 'font-bold text-lg text-error';
-                modalBox.classList = 'modal-box border border-error bg-base-100 text-base-content';
-            } else {
-                modalTitle.classList = 'font-bold text-lg text-primary';
-                modalBox.classList = 'modal-box border border-primary bg-base-100 text-base-content';
-            }
-
-            document.getElementById('modal_alert').checked = true;
-        }
-
-        // Fungsi hapus data dengan konfirmasi modal DaisyUI
-        let deleteNik = null;
-
-        function delete_button(nik, nama) {
-            deleteNik = nik;
-            document.getElementById('delete_message').innerHTML = `
-        <p class="text-base-content text-opacity-80 mb-2">Anda yakin ingin menghapus data karyawan magang ini?</p>
-        <div class="divider text-base-content text-opacity-60"></div>
-        <div class="text-center">
-            <p class="font-bold text-lg">${nama}</p>
-            <p class="text-sm text-base-content text-opacity-70">NIK: ${nik}</p>
-        </div>
-    `;
-            document.getElementById('modal_delete').checked = true;
-        }
-
-        // Tombol konfirmasi hapus ditekan
-        document.getElementById('confirm_delete_btn').addEventListener('click', function() {
-            if (!deleteNik) return;
-
-            $.ajax({
-                type: "post",
-                url: "{{ route('admin.karyawan.delete') }}",
-                data: {
-                    "_token": "{{ csrf_token() }}",
-                    "nik": deleteNik
-                },
-                success: function(response) {
-                    document.getElementById('modal_delete').checked = false;
-                    showModalAlert('Berhasil Dihapus!', response.message, 'success');
-                    setTimeout(() => location.reload(), 1500);
-                },
-                error: function(response) {
-                    document.getElementById('modal_delete').checked = false;
-                    const message = response.responseJSON?.message ||
-                        'Terjadi kesalahan saat menghapus data.';
-                    showModalAlert('Gagal Menghapus!', message, 'error');
-                }
-            });
-        });
-
-        function edit_button(nik) {
-            // Loading effect start
-            let loading = `<span class="loading loading-dots loading-md text-primary"></span>`; // Menggunakan warna primary
-            $("#loading_edit1").html(loading);
-            $("#loading_edit2").html(loading);
-            $("#loading_edit3").html(loading);
-            $("#loading_edit4").html(loading);
-            $("#loading_edit5").html(loading);
-            $("#loading_edit6").html(loading);
-            $("#loading_edit7").html(loading);
-
-            $("select[id='departemen_id']").children().remove().end();
-            $(".foto-edit-preview").hide().attr("src", ""); // Sembunyikan dan kosongkan preview saat modal dibuka
-
-            $.ajax({
-                type: "get",
-                url: "{{ route('admin.karyawan.edit') }}",
-                data: {
-                    "_token": "{{ csrf_token() }}",
-                    "nik": nik
-                },
-                success: function(data) {
-                    let items = [];
-                    $.each(data, function(key, val) {
-                        items.push(val);
-                    });
-
-                    $("input[name='nik_lama']").val(items[0]);
-                    $("input[name='nik']").val(items[0]);
-                    $("input[name='nama_lengkap']").val(items[2]);
-                    $("input[name='jabatan']").val(items[4]);
-                    $("input[name='telepon']").val(items[5]);
-                    $("input[name='email']").val(items[6]);
-
-                    const departemen = @json($departemen);
-                    let options = '<option disabled>Pilih Instansi!</option>';
-                    departemen.forEach(item => {
-                        const isSelected = item.id == items[1] ? 'selected' : '';
-                        options += `<option value="${item.id}" ${isSelected}>${item.nama}</option>`;
-                    });
-                    $("select[id='departemen_id']").html(options);
-
-                    if (items[3] != null) {
-                        $(".foto-edit-preview").attr("src",
-                            `{{ asset('storage/unggah/karyawan/${items[3]}') }}`).show();
-                    } else {
-                        $(".foto-edit-preview").hide();
-                    }
-
-                    // Loading effect end
-                    loading = "";
-                    $("#loading_edit1").html(loading);
-                    $("#loading_edit2").html(loading);
-                    $("#loading_edit3").html(loading);
-                    $("#loading_edit4").html(loading);
-                    $("#loading_edit5").html(loading);
-                    $("#loading_edit6").html(loading);
-                    $("#loading_edit7").html(loading);
-                }
-            });
-        }
-    </script>
+  
 </x-app-layout>

@@ -88,167 +88,174 @@ class KaryawanController extends Controller
         return $this->exportDataToExcel($fileName, $headings, $exportData, 'xlsx'); // Bisa juga 'csv'
     }
 
-    public function importKaryawan(Request $request)
-    {
-        $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv',
-        ], [
-            'file.required' => 'Harap pilih file untuk diunggah.',
-            'file.mimes' => 'File harus berformat Excel (xlsx, xls) atau CSV.',
-        ]);
+   public function importKaryawan(Request $request)
+{
+    $request->validate([
+        'file' => 'required|mimes:xlsx,xls,csv',
+    ], [
+        'file.required' => 'Harap pilih file untuk diunggah.',
+        'file.mimes' => 'File harus berformat Excel (xlsx, xls) atau CSV.',
+    ]);
 
-        $file = $request->file('file');
-        $filePath = $file->getRealPath();
-        $spreadsheet = IOFactory::load($filePath);
-        $sheetData = $spreadsheet->getActiveSheet()->toArray(null, true, true, true);
+    $file = $request->file('file');
+    $filePath = $file->getRealPath();
+    $spreadsheet = IOFactory::load($filePath);
+    $sheetData = $spreadsheet->getActiveSheet()->toArray(null, true, true, true);
 
-        // Asumsi baris pertama adalah header
-        $header = array_map('trim', $sheetData[1]); // Membersihkan spasi di header
-        unset($sheetData[1]); // Hapus baris header dari data
+    // Asumsi baris pertama adalah header
+    $header = array_map('trim', $sheetData[1]);
+    unset($sheetData[1]);
 
-        $expectedHeaders = [
-            'NIK',
-            'ID Departemen', // Atau 'Nama Instansi' jika import menggunakan nama
-            'Nama Lengkap',
-            'Posisi',
-            'Telepon',
-            'Email',
-            'Password' // Password bisa opsional
-        ];
+    $expectedHeaders = [
+        'NIK',
+        'ID Departemen',
+        'Nama Lengkap',
+        'Posisi',
+        'Telepon',
+        'Email',
+        'Password'
+    ];
 
-        // Validasi header
-        foreach ($expectedHeaders as $expected) {
-            if (!in_array($expected, $header)) {
-                if ($expected === 'Password') {
-                    continue; // Password bisa opsional, abaikan jika tidak ada di header
-                }
-                return to_route('admin.karyawan')->with('error', "Kolom '$expected' tidak ditemukan di file Excel/CSV. Harap periksa template.");
-            }
+    // Validasi header
+    foreach ($expectedHeaders as $expected) {
+        if ($expected === 'Password') {
+            continue; // Password opsional
         }
+        if (!in_array($expected, $header)) {
+            return to_route('admin.karyawan')->with('error', "Kolom '$expected' tidak ditemukan di file Excel/CSV. Harap periksa template.");
+        }
+    }
 
-        $importedRows = [];
-        $errors = [];
+    $importedRows = 0; // Ubah dari array ke counter
+    $errors = [];
 
-        DB::beginTransaction(); // Mulai transaksi database
-        try {
-            foreach ($sheetData as $rowNum => $row) {
-                // Lewati baris kosong
-                if (empty(array_filter($row))) {
-                    continue;
-                }
+    DB::beginTransaction();
+    try {
+        foreach ($sheetData as $rowNum => $row) {
+            // Lewati baris kosong
+            if (empty(array_filter($row))) {
+                continue;
+            }
 
-                // Mapping kolom berdasarkan header
-                $data = [];
-                foreach ($header as $colLetter => $colName) {
-                    $data[$colName] = $row[$colLetter] ?? null;
-                }
+            // Mapping kolom berdasarkan header
+            $data = [];
+            foreach ($header as $colLetter => $colName) {
+                $data[$colName] = $row[$colLetter] ?? null;
+            }
 
-                // Data yang akan diimpor
-                $nik = $data['NIK'] ?? null;
-                $departemenIdentifier = $data['ID Departemen'] ?? ($data['Nama Instansi'] ?? null); // Bisa ID atau Nama
-                $namaLengkap = $data['Nama Lengkap'] ?? null;
-                $jabatan = $data['Posisi'] ?? null;
-                $telepon = $data['Telepon'] ?? null;
-                $email = $data['Email'] ?? null;
-                $password = $data['Password'] ?? null;
+            // Data yang akan diimpor
+            $nik = trim($data['NIK'] ?? '');
+            $departemenIdentifier = trim($data['ID Departemen'] ?? ($data['Nama Instansi'] ?? ''));
+            $namaLengkap = trim($data['Nama Lengkap'] ?? '');
+            $jabatan = trim($data['Posisi'] ?? '');
+            $telepon = trim($data['Telepon'] ?? '');
+            $email = trim($data['Email'] ?? '');
+            $password = isset($data['Password']) ? trim($data['Password']) : null;
 
-                // Validasi data (sangat penting untuk import)
-                $rules = [
-                    'nik' => 'required|string|max:255',
-                    'departemen_identifier' => 'required',
-                    'nama_lengkap' => 'required|string|max:255',
-                    'jabatan' => 'required|string|max:255',
-                    'telepon' => 'required|string|max:15',
-                    'email' => 'required|string|email|max:255',
-                    'password' => 'nullable|string|min:6',
-                ];
+            // Validasi data
+            $rules = [
+                'nik' => 'required|string|max:255',
+                'departemen_identifier' => 'required',
+                'nama_lengkap' => 'required|string|max:255',
+                'jabatan' => 'required|string|max:255',
+                'telepon' => 'required|string|max:15',
+                'email' => 'required|string|email|max:255',
+                'password' => 'nullable|string|min:6',
+            ];
 
-                $validator = \Illuminate\Support\Facades\Validator::make([
-                    'nik' => $nik,
-                    'departemen_identifier' => $departemenIdentifier,
-                    'nama_lengkap' => $namaLengkap,
-                    'jabatan' => $jabatan,
-                    'telepon' => $telepon,
-                    'email' => $email,
-                    'password' => $password,
-                ], $rules);
+            $validator = \Illuminate\Support\Facades\Validator::make([
+                'nik' => $nik,
+                'departemen_identifier' => $departemenIdentifier,
+                'nama_lengkap' => $namaLengkap,
+                'jabatan' => $jabatan,
+                'telepon' => $telepon,
+                'email' => $email,
+                'password' => $password,
+            ], $rules);
 
-                if ($validator->fails()) {
-                    $errors[] = "Baris " . $rowNum . ": " . implode(", ", $validator->errors()->all());
-                    continue; // Lanjut ke baris berikutnya
-                }
+            if ($validator->fails()) {
+                $errors[] = "Baris $rowNum: " . implode(", ", $validator->errors()->all());
+                continue;
+            }
 
-                // Temukan ID Departemen
-                $departemenId = null;
-                if (is_numeric($departemenIdentifier)) {
-                    $departemen = Departemen::find($departemenIdentifier);
-                } else {
-                    $departemen = Departemen::where('nama', $departemenIdentifier)->first();
-                }
+            // Temukan ID Departemen
+            $departemen = null;
+            if (is_numeric($departemenIdentifier)) {
+                $departemen = Departemen::find($departemenIdentifier);
+            } else {
+                $departemen = Departemen::where('nama', $departemenIdentifier)->first();
+            }
 
-                if (!$departemen) {
-                    $errors[] = "Baris " . $rowNum . ": Instansi '$departemenIdentifier' tidak ditemukan.";
-                    continue;
-                }
-                $departemenId = $departemen->id;
+            if (!$departemen) {
+                $errors[] = "Baris $rowNum: Instansi '$departemenIdentifier' tidak ditemukan.";
+                continue;
+            }
+            $departemenId = $departemen->id;
 
-                // Cek NIK dan Email unik
-                $existingKaryawan = Karyawan::where('nik', $nik)->first();
-                if ($existingKaryawan && $existingKaryawan->email !== $email) {
-                    // Jika NIK sama tapi email beda, ini adalah konflik data
-                    $errors[] = "Baris " . $rowNum . ": NIK '$nik' sudah ada dengan email yang berbeda. Harap perbaiki atau hapus data lama.";
-                    continue;
-                }
-                $existingEmailKaryawan = Karyawan::where('email', $email)->first();
-                if ($existingEmailKaryawan && $existingEmailKaryawan->nik !== $nik) {
-                    // Jika Email sama tapi NIK beda, ini adalah konflik data
-                    $errors[] = "Baris " . $rowNum . ": Email '$email' sudah digunakan oleh karyawan dengan NIK berbeda. Harap perbaiki atau hapus data lama.";
-                    continue;
-                }
+            // Cek NIK dan Email unik
+            $existingKaryawan = Karyawan::where('nik', $nik)->first();
+            if ($existingKaryawan && $existingKaryawan->email !== $email) {
+                $errors[] = "Baris $rowNum: NIK '$nik' sudah ada dengan email yang berbeda.";
+                continue;
+            }
+            
+            $existingEmailKaryawan = Karyawan::where('email', $email)->first();
+            if ($existingEmailKaryawan && $existingEmailKaryawan->nik !== $nik) {
+                $errors[] = "Baris $rowNum: Email '$email' sudah digunakan oleh karyawan dengan NIK berbeda.";
+                continue;
+            }
 
+            $karyawanData = [
+                'departemen_id' => $departemenId,
+                'nama_lengkap' => $namaLengkap,
+                'jabatan' => $jabatan,
+                'telepon' => $telepon,
+                'email' => $email,
+            ];
 
-                $karyawanData = [
-                    'departemen_id' => $departemenId,
-                    'nama_lengkap' => $namaLengkap,
-                    'jabatan' => $jabatan,
-                    'telepon' => $telepon,
-                    'email' => $email,
-                ];
-
+            if ($existingKaryawan) {
+                // Update karyawan yang sudah ada
                 if ($password) {
                     $karyawanData['password'] = Hash::make($password);
                 }
-
-                if ($existingKaryawan) {
-                    // Update karyawan yang sudah ada
-                    Karyawan::where('nik', $nik)->update($karyawanData);
-                } else {
-                    // Buat karyawan baru (pastikan password ada untuk karyawan baru)
-                    if (!$password) {
-                        $errors[] = "Baris " . $rowNum . ": Password wajib diisi untuk karyawan baru dengan NIK '$nik'.";
-                        continue;
-                    }
-                    Karyawan::create(array_merge(['nik' => $nik], $karyawanData));
+                Karyawan::where('nik', $nik)->update($karyawanData);
+                $importedRows++;
+            } else {
+                // Buat karyawan baru - password wajib
+                if (!$password) {
+                    $errors[] = "Baris $rowNum: Password wajib diisi untuk karyawan baru dengan NIK '$nik'.";
+                    continue;
                 }
-                $importedRows[] = $rowNum;
+                $karyawanData['password'] = Hash::make($password);
+                Karyawan::create(array_merge(['nik' => $nik], $karyawanData));
+                $importedRows++;
             }
-
-            if (!empty($errors)) {
-                DB::rollBack(); // Rollback jika ada error validasi
-                $errorMessage = "Gagal mengimpor data. Beberapa baris memiliki kesalahan:<br>";
-                foreach ($errors as $error) {
-                    $errorMessage .= "- " . $error . "<br>";
-                }
-                return to_route('admin.karyawan')->with('error', $errorMessage);
-            }
-
-            DB::commit(); // Commit transaksi jika semua berhasil
-            return to_route('admin.karyawan')->with('success', 'Data Karyawan berhasil diimpor (' . count($importedRows) . ' baris).');
-        } catch (\Exception $e) {
-            DB::rollBack(); // Rollback jika terjadi exception
-            return to_route('admin.karyawan')->with('error', 'Gagal mengimpor data: ' . $e->getMessage());
         }
+
+        // PENTING: Cek apakah ada error ATAU tidak ada data yang berhasil diimport
+        if (!empty($errors)) {
+            DB::rollBack();
+            $errorMessage = "Gagal mengimpor data. Beberapa baris memiliki kesalahan:<br>";
+            foreach ($errors as $error) {
+                $errorMessage .= "- $error<br>";
+            }
+            return to_route('admin.karyawan')->with('error', $errorMessage);
+        }
+
+        // Cek apakah ada data yang berhasil diimport
+        if ($importedRows === 0) {
+            DB::rollBack();
+            return to_route('admin.karyawan')->with('error', 'Tidak ada data yang berhasil diimpor. Periksa format file Anda.');
+        }
+
+        DB::commit();
+        return to_route('admin.karyawan')->with('success', "Data Karyawan berhasil diimpor ($importedRows baris).");
+        
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return to_route('admin.karyawan')->with('error', 'Gagal mengimpor data: ' . $e->getMessage());
     }
+}
 
     public function index()
     {

@@ -24,6 +24,8 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
     <script>
         // Script untuk mengatur tema dari localStorage atau default
@@ -89,30 +91,32 @@
     {{-- =========================================
          🔹 SCRIPT GLOBAL
     ========================================== --}}
-    <script>
-        // === AJAX: tampilkan overlay saat request jalan ===
-        $(document).ajaxStart(function() {
-            $('#global-loading-overlay').removeClass('hidden').addClass('flex');
-        });
-        $(document).ajaxStop(function() {
-            $('#global-loading-overlay').removeClass('flex').addClass('hidden');
-        });
+   <script>
+    // === AJAX: tampilkan overlay saat request jalan ===
+    $(document).ajaxStart(function() {
+        $('#global-loading-overlay').removeClass('hidden').addClass('flex');
+    });
+    $(document).ajaxStop(function() {
+        $('#global-loading-overlay').removeClass('flex').addClass('hidden');
+    });
 
-        // === Form submit manual ===
-        $(document).on('submit', 'form', function() {
+    // === Form submit manual - kecuali yang memiliki class no-loading ===
+    $(document).on('submit', 'form', function(e) {
+        if (!$(this).hasClass('no-loading')) {
             $('#global-loading-overlay').removeClass('hidden').addClass('flex');
-        });
+        }
+    });
 
-        // === Saat halaman baru dimuat, overlay muncul dulu ===
-        window.addEventListener('beforeunload', function() {
-            $('#global-loading-overlay').removeClass('hidden').addClass('flex');
-        });
+    // === HAPUS EVENT BEFOREUNLOAD - ini yang bikin masalah ===
+    // window.addEventListener('beforeunload', function() {
+    //     $('#global-loading-overlay').removeClass('hidden').addClass('flex');
+    // });
 
-        // === Sembunyikan overlay setelah halaman selesai render ===
-        window.addEventListener('load', function() {
-            $('#global-loading-overlay').addClass('hidden').removeClass('flex');
-        });
-    </script>
+    // === Sembunyikan overlay setelah halaman selesai render ===
+    window.addEventListener('load', function() {
+        $('#global-loading-overlay').addClass('hidden').removeClass('flex');
+    });
+</script>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"
         integrity="sha512-v2CJ7UaYy4JwqLDIrZUI/4hqeoQieOmAZNXBeQyjo21dadnwR+8ZaIJVT8EE2iyI61OV8e6M8PP2/4hpQINQ/g=="
